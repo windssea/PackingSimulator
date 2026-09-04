@@ -14,6 +14,8 @@ const V1_KEY = 'shouna-planner-v1';
 const isValidPlan = (p) =>
   p && typeof p.id === 'string' && typeof p.container?.w === 'number' && Array.isArray(p.specs);
 
+export { isValidPlan };
+
 /**
  * 读取方案库。返回 { plans, activeId }；没有可用数据时返回 null（调用方用默认值）
  */
@@ -132,4 +134,26 @@ export function mergePlans(existing, imported) {
     return { ...p, id, name };
   });
   return [...existing, ...merged];
+}
+
+/* ---------- 链接分享：把方案编码进 URL hash，扫码即开 ---------- */
+
+/** 方案 → base64url 字符串（放进 #p= 后面） */
+export function encodePlanHash(plan) {
+  const json = JSON.stringify(plan);
+  return btoa(unescape(encodeURIComponent(json)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+/** #p=xxxx → 方案对象；坏了返回 null（忽略坏链接，不影响启动） */
+export function decodePlanHash(hash) {
+  try {
+    const s = hash.replace(/^#p=/, '').replace(/-/g, '+').replace(/_/g, '/');
+    const plan = JSON.parse(decodeURIComponent(escape(atob(s))));
+    return isValidPlan(plan) ? plan : null;
+  } catch {
+    return null;
+  }
 }

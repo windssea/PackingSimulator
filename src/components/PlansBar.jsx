@@ -17,6 +17,7 @@ export default function PlansBar({
   onExportJson,
   onImport,
   onImportError,
+  onShare,
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -105,6 +106,9 @@ export default function PlansBar({
         </button>
         <button className={styles.planAction} onClick={() => fileRef.current?.click()}>
           导入方案
+        </button>
+        <button className={styles.planAction} onClick={onShare}>
+          分享
         </button>
         <input
           ref={fileRef}

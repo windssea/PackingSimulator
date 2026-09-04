@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { packBoxes } from '../lib/packing';
+import { copyText } from '../lib/clipboard';
 import styles from './ShoppingList.module.css';
 
 /**
@@ -51,25 +52,6 @@ function buildText(rows, planCount) {
   });
   lines.push('', `合计 ${rows.reduce((n, r) => n + r.total, 0)} 个`);
   return lines.join('\n');
-}
-
-async function copyText(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    try {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      const ok = document.execCommand('copy');
-      ta.remove();
-      return ok;
-    } catch {
-      return false;
-    }
-  }
 }
 
 export default function ShoppingList({ plans, onClose }) {

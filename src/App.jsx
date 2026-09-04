@@ -6,9 +6,17 @@ import OptionsPanel from './components/OptionsPanel';
 import ResultPanel from './components/ResultPanel';
 import PlansBar from './components/PlansBar';
 import ShoppingList from './components/ShoppingList';
+import ShareModal from './components/ShareModal';
 import { packBoxes, CANDY_COLORS } from './lib/packing';
 import { exportPlanImage } from './lib/exportImage';
-import { loadPlansStore, savePlansStore, nextPlanNumber, exportPlansJson, mergePlans } from './lib/plans';
+import {
+  loadPlansStore,
+  savePlansStore,
+  nextPlanNumber,
+  exportPlansJson,
+  mergePlans,
+  decodePlanHash,
+} from './lib/plans';
 import styles from './App.module.css';
 
 const INITIAL_CONTAINER = { w: 60, d: 45, h: 40 };
@@ -61,6 +69,7 @@ export default function App() {
   const [progress, setProgress] = useState(1);
   const [exporting, setExporting] = useState(false);
   const [showList, setShowList] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const [toast, setToast] = useState('');
 
   const sceneRef = useRef(null);
@@ -123,6 +132,28 @@ export default function App() {
   const renamePlan = (id, name) => {
     setPlans((prev) => prev.map((p) => (p.id === id ? { ...p, name } : p)));
   };
+
+  /** 打开分享链接：#p= 里的方案并入方案库并切换过去（数据全在链接里）
+   *  首次挂载和 hashchange 都处理——已打开应用时再点分享链接是 hash 变化，不重载页面 */
+  useEffect(() => {
+    const consume = () => {
+      if (!location.hash.startsWith('#p=')) return;
+      const plan = decodePlanHash(location.hash);
+      // 先消费掉 hash，避免刷新或再次 hashchange 时重复导入
+      history.replaceState(null, '', location.pathname + location.search);
+      if (plan) {
+        setPlans((prev) => (prev.some((p) => p.id === plan.id) ? prev : [...prev, plan]));
+        loadPlanIntoEditor(plan);
+        setActiveId(plan.id);
+        setToast(`已打开分享的方案「${plan.name}」`);
+        setTimeout(() => setToast(''), 2600);
+      }
+    };
+    consume();
+    window.addEventListener('hashchange', consume);
+    return () => window.removeEventListener('hashchange', consume);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const deletePlan = (id) => {
     if (plans.length <= 1) return;
@@ -358,6 +389,7 @@ export default function App() {
             onExportJson={exportJson}
             onImport={importPlans}
             onImportError={importError}
+            onShare={() => setShowShare(true)}
           />
           <ContainerPanel value={container} onChange={setContainer} />
           <BoxList specs={specs} onUpdate={updateSpec} onAdd={addSpec} onRemove={removeSpec} />
@@ -442,6 +474,12 @@ export default function App() {
 
       {toast && <div className={styles.toast}>{toast}</div>}
       {showList && <ShoppingList plans={plans} onClose={() => setShowList(false)} />}
+      {showShare && (
+        <ShareModal
+          plan={{ ...activePlan, container, specs, gap, strategy, allowRotate }}
+          onClose={() => setShowShare(false)}
+        />
+      )}
     </div>
   );
 }
