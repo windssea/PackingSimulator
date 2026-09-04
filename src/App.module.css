@@ -86,6 +86,28 @@
   color: var(--brand-deep);
 }
 
+.headerActions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.listBtn {
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--mint);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  border: none;
+  box-shadow: 0 4px 10px rgba(29, 158, 117, 0.26);
+  transition: transform 0.14s ease;
+}
+
+.listBtn:hover {
+  transform: translateY(-1px);
+}
+
 .main {
   display: grid;
   grid-template-columns: 296px minmax(360px, 1fr) 296px;

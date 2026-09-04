@@ -331,3 +331,45 @@
   width: 100%;
   accent-color: var(--brand);
 }
+
+/* 方案管理条 */
+.planRow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.planSelect {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.planBtn {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  flex: none;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--ink-soft);
+  background: var(--cream);
+  transition: all 0.14s ease;
+  display: grid;
+  place-items: center;
+}
+
+.planBtn:hover {
+  background: var(--brand-soft);
+  color: var(--brand-deep);
+}
+
+.planBtnOff {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.planBtnOff:hover {
+  background: var(--cream);
+  color: var(--ink-soft);
+}

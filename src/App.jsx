@@ -4,11 +4,13 @@ import ContainerPanel from './components/ContainerPanel';
 import BoxList from './components/BoxList';
 import OptionsPanel from './components/OptionsPanel';
 import ResultPanel from './components/ResultPanel';
+import PlansBar from './components/PlansBar';
+import ShoppingList from './components/ShoppingList';
 import { packBoxes, CANDY_COLORS } from './lib/packing';
 import { exportPlanImage } from './lib/exportImage';
+import { loadPlansStore, savePlansStore, nextPlanNumber } from './lib/plans';
 import styles from './App.module.css';
 
-const STORAGE_KEY = 'shouna-planner-v1';
 const INITIAL_CONTAINER = { w: 60, d: 45, h: 40 };
 const INITIAL_SPECS = [
   { id: 's1', name: '衣物百纳箱', w: 30, d: 22, h: 14, color: CANDY_COLORS[0], count: '' },
@@ -25,34 +27,32 @@ const VIEWS = [
 
 const STRATEGY_LABEL = { tidy: '整齐码放', maximal: '极限填充' };
 
-/** 从 localStorage 读取上次的方案；坏了就回退默认值 */
-function loadSaved() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const data = JSON.parse(raw);
-    if (
-      !data ||
-      typeof data.container?.w !== 'number' ||
-      !Array.isArray(data.specs)
-    ) {
-      return null;
-    }
-    return data;
-  } catch {
-    return null;
-  }
-}
+const freshPlan = (n) => ({
+  id: `p${n}`,
+  name: `方案 ${n}`,
+  container: { ...INITIAL_CONTAINER },
+  specs: INITIAL_SPECS.map((s) => ({ ...s })),
+  gap: 0.5,
+  strategy: 'tidy',
+  allowRotate: false,
+});
 
 export default function App() {
-  // 只在首次渲染时读一次 localStorage
-  const [saved] = useState(loadSaved);
+  // 只在首次渲染时读一次方案库（含 v1 老数据迁移）
+  const [initialStore] = useState(() => {
+    const loaded = loadPlansStore();
+    return loaded ?? { plans: [freshPlan(1)], activeId: 'p1' };
+  });
 
-  const [container, setContainer] = useState(saved?.container ?? INITIAL_CONTAINER);
-  const [specs, setSpecs] = useState(saved?.specs ?? INITIAL_SPECS);
-  const [gap, setGap] = useState(saved?.gap ?? 0.5);
-  const [strategy, setStrategy] = useState(saved?.strategy ?? 'tidy');
-  const [allowRotate, setAllowRotate] = useState(saved?.allowRotate ?? false);
+  const [plans, setPlans] = useState(initialStore.plans);
+  const [activeId, setActiveId] = useState(initialStore.activeId);
+  const activePlan = plans.find((p) => p.id === activeId) ?? plans[0];
+
+  const [container, setContainer] = useState(activePlan.container);
+  const [specs, setSpecs] = useState(activePlan.specs);
+  const [gap, setGap] = useState(activePlan.gap);
+  const [strategy, setStrategy] = useState(activePlan.strategy);
+  const [allowRotate, setAllowRotate] = useState(activePlan.allowRotate);
   const [viewMode, setViewMode] = useState('iso');
   const [viewNonce, setViewNonce] = useState(0); // 每次点视角按钮都 +1，强制重新取景（拖走相机后点同一个按钮也能回位）
   const [explode, setExplode] = useState(0);
@@ -60,15 +60,17 @@ export default function App() {
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(1);
   const [exporting, setExporting] = useState(false);
+  const [showList, setShowList] = useState(false);
   const [toast, setToast] = useState('');
 
   const sceneRef = useRef(null);
   const firstRunRef = useRef(true);
-  // id 计数从已加载方案的最大编号接着走，避免删除再添加时撞 id
+  const planNumRef = useRef(nextPlanNumber(initialStore.plans));
+  // 盒子 id 计数从所有方案的最大编号接着走，避免撞 id
   const idRef = useRef(
     Math.max(
       4,
-      ...(saved?.specs ?? []).reduce((acc, s) => {
+      ...initialStore.plans.flatMap((p) => p.specs).reduce((acc, s) => {
         const n = Number(String(s?.id ?? '').replace(/\D/g, ''));
         if (n) acc.push(n);
         return acc;
@@ -76,15 +78,63 @@ export default function App() {
     )
   );
 
-  // 方案变化时自动保存
+  // 编辑中的字段实时同步回当前方案
   useEffect(() => {
-    const payload = { container, specs, gap, strategy, allowRotate };
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-    } catch {
-      /* 隐私模式等场景写不进就算了，不影响使用 */
+    setPlans((prev) =>
+      prev.map((p) =>
+        p.id === activeId ? { ...p, container, specs, gap, strategy, allowRotate } : p
+      )
+    );
+  }, [container, specs, gap, strategy, allowRotate, activeId]);
+
+  // 方案库变化时自动持久化
+  useEffect(() => {
+    savePlansStore({ plans, activeId });
+  }, [plans, activeId]);
+
+  /** 把某个方案的字段载入编辑器 */
+  const loadPlanIntoEditor = (plan) => {
+    setContainer(plan.container);
+    setSpecs(plan.specs);
+    setGap(plan.gap);
+    setStrategy(plan.strategy);
+    setAllowRotate(plan.allowRotate);
+    setActiveLayer(null);
+    setExplode(0);
+  };
+
+  const switchPlan = (id) => {
+    const target = plans.find((p) => p.id === id);
+    if (!target || id === activeId) return;
+    loadPlanIntoEditor(target);
+    setActiveId(id);
+  };
+
+  const newPlan = () => {
+    const plan = freshPlan(planNumRef.current);
+    planNumRef.current += 1;
+    setPlans((prev) => [...prev, plan]);
+    loadPlanIntoEditor(plan);
+    setActiveId(plan.id);
+    setToast(`已新建「${plan.name}」`);
+    setTimeout(() => setToast(''), 2000);
+  };
+
+  const renamePlan = (id, name) => {
+    setPlans((prev) => prev.map((p) => (p.id === id ? { ...p, name } : p)));
+  };
+
+  const deletePlan = (id) => {
+    if (plans.length <= 1) return;
+    const remaining = plans.filter((p) => p.id !== id);
+    setPlans(remaining);
+    if (id === activeId) {
+      loadPlanIntoEditor(remaining[0]);
+      setActiveId(remaining[0].id);
     }
-  }, [container, specs, gap, strategy, allowRotate]);
+    setToast('方案已删除');
+    setTimeout(() => setToast(''), 2000);
+  };
 
   const packSpecs = useMemo(() => specs.map((s) => ({ ...s, count: Number(s.count) || 0 })), [specs]);
 
@@ -207,16 +257,17 @@ export default function App() {
     }
   };
 
+  /** 重置当前方案为默认设置（不影响其他方案） */
   const resetAll = () => {
-    setContainer(INITIAL_CONTAINER);
-    setSpecs(INITIAL_SPECS);
+    setContainer({ ...INITIAL_CONTAINER });
+    setSpecs(INITIAL_SPECS.map((s) => ({ ...s })));
     setGap(0.5);
     setStrategy('tidy');
     setAllowRotate(false);
     setViewMode('iso');
     setExplode(0);
     setActiveLayer(null);
-    setToast('已恢复默认方案');
+    setToast('当前方案已重置');
     setTimeout(() => setToast(''), 2000);
   };
 
@@ -237,13 +288,26 @@ export default function App() {
             <p className={styles.sub}>填好柜子和盒子的尺寸，看看这一格到底能塞几个</p>
           </div>
         </div>
-        <button className={styles.reset} onClick={resetAll}>
-          恢复默认
-        </button>
+        <div className={styles.headerActions}>
+          <button className={styles.listBtn} onClick={() => setShowList(true)}>
+            购物清单
+          </button>
+          <button className={styles.reset} onClick={resetAll}>
+            重置本方案
+          </button>
+        </div>
       </header>
 
       <main className={styles.main}>
         <aside className={styles.left}>
+          <PlansBar
+            plans={plans}
+            activeId={activeId}
+            onSwitch={switchPlan}
+            onNew={newPlan}
+            onRename={renamePlan}
+            onDelete={deletePlan}
+          />
           <ContainerPanel value={container} onChange={setContainer} />
           <BoxList specs={specs} onUpdate={updateSpec} onAdd={addSpec} onRemove={removeSpec} />
           <OptionsPanel
@@ -326,6 +390,7 @@ export default function App() {
       </main>
 
       {toast && <div className={styles.toast}>{toast}</div>}
+      {showList && <ShoppingList plans={plans} onClose={() => setShowList(false)} />}
     </div>
   );
 }
