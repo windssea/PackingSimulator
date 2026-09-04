@@ -1,0 +1,19 @@
+{
+  "name": "收纳装箱模拟器",
+  "short_name": "收纳装箱",
+  "description": "填好柜子和盒子的尺寸，看看这一格到底能塞几个",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#FDF6EC",
+  "theme_color": "#F0997B",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
