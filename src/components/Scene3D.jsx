@@ -270,6 +270,26 @@ const Scene3D = forwardRef(function Scene3D(
     renderer.domElement.addEventListener('pointermove', onPointerMove);
     renderer.domElement.addEventListener('pointerleave', onPointerLeave);
 
+    // 点按选中：触屏没有悬停，轻点盒子固定显示规格；点到空白处取消
+    let downInfo = null;
+    const onPointerDown = (e) => {
+      downInfo = { x: e.clientX, y: e.clientY, t: performance.now() };
+    };
+    const onPointerUp = (e) => {
+      if (!downInfo) return;
+      const moved = Math.hypot(e.clientX - downInfo.x, e.clientY - downInfo.y);
+      const elapsed = performance.now() - downInfo.t;
+      downInfo = null;
+      if (moved > 6 || elapsed > 400) return; // 是拖拽旋转，不是点按
+      const rect = renderer.domElement.getBoundingClientRect();
+      store.pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      store.pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      store.pointerPx = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      store.tapSelect = true; // 主循环下一帧做射线检测并固定提示
+    };
+    renderer.domElement.addEventListener('pointerdown', onPointerDown);
+    renderer.domElement.addEventListener('pointerup', onPointerUp);
+
     // 用户任何交互（拖拽 / 平移 / 缩放）都立即取消视角过渡，避免和插值打架
     const onUserInteract = () => {
       store.viewTransition = false;
@@ -315,6 +335,20 @@ const Scene3D = forwardRef(function Scene3D(
       }
 
       updateBoxes(store, anim.progress, paramsRef.current);
+
+      // 点按选中：在主循环里做射线检测，选中就固定提示，点到空白清除
+      if (store.tapSelect) {
+        store.tapSelect = false;
+        store.raycaster.setFromCamera(store.pointer, camera);
+        const visibleMeshes = [];
+        store.boxes.forEach((b) => {
+          if (b.mesh.visible) visibleMeshes.push(b.mesh);
+        });
+        const hit = store.raycaster.intersectObjects(visibleMeshes, false)[0];
+        store.pinned = hit
+          ? { mesh: hit.object, info: hit.object.userData.info, px: { ...store.pointerPx } }
+          : null;
+      }
       updateHover(store, camera);
 
       // 阴影省电：动画播放 / 展开拖拽期间每帧重算阴影贴图；
@@ -355,6 +389,8 @@ const Scene3D = forwardRef(function Scene3D(
       ro.disconnect();
       renderer.domElement.removeEventListener('pointermove', onPointerMove);
       renderer.domElement.removeEventListener('pointerleave', onPointerLeave);
+      renderer.domElement.removeEventListener('pointerdown', onPointerDown);
+      renderer.domElement.removeEventListener('pointerup', onPointerUp);
       controls.removeEventListener('start', onUserInteract);
       controls.dispose();
       renderer.dispose();
@@ -433,6 +469,7 @@ const Scene3D = forwardRef(function Scene3D(
     store.boxMaterials.forEach((m) => m.dispose());
     store.boxMaterials.clear();
     store.hoverOutline.visible = false;
+    store.pinned = null; // 盒子重建后旧的选中引用失效，避免描边停在幽灵位置
 
     const S = store.scale;
     const { w: CW, h: CH, d: CD } = store.containerSize;
@@ -498,7 +535,7 @@ const Scene3D = forwardRef(function Scene3D(
     <div className={styles.wrap}>
       <div className={styles.canvas} ref={mountRef} />
       <div className={styles.tip} ref={tipRef} />
-      <div className={styles.hint}>左键拖动旋转 · 右键平移 · 滚轮缩放 · 悬停看规格</div>
+      <div className={styles.hint}>拖动旋转 · 滚轮缩放 · 悬停或点按盒子看规格</div>
     </div>
   );
 });
@@ -561,8 +598,30 @@ function updateBoxes(store, progress, { explode = 0, activeLayer = null } = {}) 
   });
 }
 
-/** 悬停检测：高亮描边 + 跟随鼠标的提示气泡 */
+/** 提示气泡统一出口：悬停跟随鼠标；点按选中后固定显示 */
+function showTip(store, info, px) {
+  const tip = store.tipEl;
+  if (!tip) return;
+  tip.innerHTML = `<b>${info.name}</b><i>${info.w} × ${info.d} × ${info.h} cm</i><i>第 ${info.layer + 1} 层</i>`;
+  tip.style.transform = `translate(${px.x + 16}px, ${px.y + 14}px)`;
+  tip.style.opacity = '1';
+}
+
+/** 悬停检测：高亮描边 + 跟随鼠标的提示气泡；点按选中的盒子优先固定显示 */
 function updateHover(store, camera) {
+  // 点按选中的固定显示（触屏的主要查看方式）
+  if (store.pinned) {
+    const { mesh, info, px } = store.pinned;
+    if (mesh.visible) {
+      store.hoverOutline.visible = true;
+      store.hoverOutline.position.copy(mesh.position);
+      store.hoverOutline.scale.copy(mesh.scale).multiplyScalar(1.03);
+      showTip(store, info, px);
+      return;
+    }
+    store.pinned = null; // 选中的盒子被分层过滤掉了，自动取消固定
+  }
+
   if (store.pointer.x < -1.5 || !store.boxes.length) return;
   store.raycaster.setFromCamera(store.pointer, camera);
   const meshes = [];
@@ -570,20 +629,15 @@ function updateHover(store, camera) {
     if (b.mesh.visible) meshes.push(b.mesh);
   });
   const hit = store.raycaster.intersectObjects(meshes, false)[0];
-  const tip = store.tipEl;
   if (hit) {
     const { info } = hit.object.userData;
     store.hoverOutline.visible = true;
     store.hoverOutline.position.copy(hit.object.position);
     store.hoverOutline.scale.copy(hit.object.scale).multiplyScalar(1.03);
-    if (tip) {
-      tip.innerHTML = `<b>${info.name}</b><i>${info.w} × ${info.d} × ${info.h} cm</i><i>第 ${info.layer + 1} 层</i>`;
-      tip.style.transform = `translate(${store.pointerPx.x + 16}px, ${store.pointerPx.y + 14}px)`;
-      tip.style.opacity = '1';
-    }
+    showTip(store, info, store.pointerPx);
   } else {
     store.hoverOutline.visible = false;
-    if (tip) tip.style.opacity = '0';
+    if (store.tipEl) store.tipEl.style.opacity = '0';
   }
 }
 

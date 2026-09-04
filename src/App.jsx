@@ -339,6 +339,13 @@ export default function App() {
       </header>
 
       <main className={styles.main}>
+        {/* 手机端吸顶结果条：量柜子时滚到哪都能看到能装几个 */}
+        <div className={styles.mobileSummary}>
+          能装 <b>{result.stats.total}</b> 个 · 利用率{' '}
+          {Math.round(result.stats.utilization * 100)}% · 装到{' '}
+          {result.stats.filledHeight.toFixed(1)} cm
+        </div>
+
         <aside className={styles.left}>
           <PlansBar
             plans={plans}

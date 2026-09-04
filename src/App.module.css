@@ -115,6 +115,10 @@
   align-items: start;
 }
 
+.mobileSummary {
+  display: none;
+}
+
 .left,
 .right {
   min-width: 0;
@@ -302,6 +306,27 @@
   }
   .main {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .mobileSummary {
+    display: block;
+    position: sticky;
+    top: 8px;
+    z-index: 15;
+    margin-bottom: 2px;
+    padding: 9px 16px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid var(--line-soft);
+    box-shadow: var(--shadow-soft);
+    font-size: 13px;
+    color: var(--ink-soft);
+    text-align: center;
+    backdrop-filter: blur(4px);
+  }
+  .mobileSummary b {
+    color: var(--brand-deep);
+    font-size: 18px;
+    font-weight: 800;
   }
   .right {
     grid-column: auto;
