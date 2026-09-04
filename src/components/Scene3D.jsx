@@ -79,6 +79,7 @@ const Scene3D = forwardRef(function Scene3D(
       animRef.current.playing = false;
       onProgressRef.current?.(1);
       updateBoxes(s, 1, paramsRef.current);
+      s.renderer.shadowMap.needsUpdate = true; // 阴影冻结时也要保证这一帧阴影是最新的
       s.renderer.render(s.scene, s.camera);
       return s.renderer.domElement.toDataURL('image/png');
     },
@@ -316,6 +317,23 @@ const Scene3D = forwardRef(function Scene3D(
       updateBoxes(store, anim.progress, paramsRef.current);
       updateHover(store, camera);
 
+      // 阴影省电：动画播放 / 展开拖拽期间每帧重算阴影贴图；
+      // 静止时冻结，只在布局变化（重建、分层切换、展开归零）时补算一帧。
+      // 盒子成百上千时，闲置页面不再白耗 GPU。
+      const p = paramsRef.current;
+      const prev = store.prevParams || (store.prevParams = { explode: 0, activeLayer: null });
+      const shadowLive = anim.playing || anim.progress < 1 || p.explode > 0;
+      renderer.shadowMap.autoUpdate = shadowLive;
+      if (
+        !shadowLive &&
+        (store.shadowDirty || prev.explode !== p.explode || prev.activeLayer !== p.activeLayer)
+      ) {
+        renderer.shadowMap.needsUpdate = true;
+        store.shadowDirty = false;
+      }
+      prev.explode = p.explode;
+      prev.activeLayer = p.activeLayer;
+
       // 只在预设视角过渡期间插值；用户一旦开始拖/滚轮，立刻停手把控制权交还
       if (store.viewTransition) {
         camera.position.lerp(store.desiredCam, 0.12);
@@ -466,6 +484,7 @@ const Scene3D = forwardRef(function Scene3D(
     });
 
     updateBoxes(store, animRef.current.progress, paramsRef.current);
+    store.shadowDirty = true; // 布局变了，通知主循环补算一帧阴影（阴影冻结时尤其关键）
   }, [placed, container.w, container.h, container.d]); // 容器尺寸变化会改变缩放比例，盒子必须跟着重建
 
   /* ---------- 视角切换（viewNonce 变化时也重新取景，拖走后点同一按钮可回位） ---------- */
