@@ -1,0 +1,77 @@
+:root {
+  --cream: #fdf6ec;
+  --cream-deep: #f6e9d8;
+  --card: #ffffff;
+  --ink: #4a423a;
+  --ink-soft: #8b8074;
+  --ink-faint: #b6ab9d;
+  --line: #ecdbc6;
+  --line-soft: #f4e9dc;
+  --brand: #f0997b;
+  --brand-deep: #d85a30;
+  --brand-soft: #faece7;
+  --mint: #1d9e75;
+  --mint-soft: #e1f5ee;
+  --sky: #378add;
+  --sky-soft: #e6f1fb;
+  --sun: #ef9f27;
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+  --shadow-soft: 0 6px 18px rgba(176, 148, 112, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'Nunito', 'Quicksand', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--cream);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+}
+
+input,
+select {
+  font-family: inherit;
+  color: inherit;
+}
+
+/* 隐藏数字输入的上下箭头，避免误触 */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #e3d3bd;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
