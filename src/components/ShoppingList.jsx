@@ -93,7 +93,7 @@ export default function ShoppingList({ plans, onClose }) {
   };
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
+    <div className={`${styles.overlay} shopping-list-overlay`} onClick={onClose}>
       <div className={styles.card} onClick={(e) => e.stopPropagation()}>
         <div className={styles.head}>
           <div>
@@ -102,7 +102,7 @@ export default function ShoppingList({ plans, onClose }) {
               {plans.length} 个方案汇总 · 相同尺寸的盒子已合并 · 共 {grandTotal} 个
             </p>
           </div>
-          <button className={styles.close} onClick={onClose} title="关闭">
+          <button className={`${styles.close} no-print`} onClick={onClose} title="关闭">
             ×
           </button>
         </div>
@@ -128,9 +128,12 @@ export default function ShoppingList({ plans, onClose }) {
           ))}
         </div>
 
-        <div className={styles.foot}>
+        <div className={`${styles.foot} no-print`}>
           <button className={styles.copyBtn} onClick={handleCopy} disabled={!rows.length}>
             {copied ? '已复制到剪贴板 ✓' : '复制清单'}
+          </button>
+          <button className={styles.printBtn} onClick={() => window.print()} disabled={!rows.length}>
+            打印
           </button>
           <button className={styles.ghostBtn} onClick={onClose}>
             关闭

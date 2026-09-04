@@ -373,3 +373,24 @@
   background: var(--cream);
   color: var(--ink-soft);
 }
+
+.planActions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.planAction {
+  flex: 1;
+  padding: 6px 4px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--ink-soft);
+  background: var(--cream);
+  transition: all 0.14s ease;
+}
+
+.planAction:hover {
+  background: var(--brand-soft);
+  color: var(--brand-deep);
+}

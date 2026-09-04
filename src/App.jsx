@@ -8,7 +8,7 @@ import PlansBar from './components/PlansBar';
 import ShoppingList from './components/ShoppingList';
 import { packBoxes, CANDY_COLORS } from './lib/packing';
 import { exportPlanImage } from './lib/exportImage';
-import { loadPlansStore, savePlansStore, nextPlanNumber } from './lib/plans';
+import { loadPlansStore, savePlansStore, nextPlanNumber, exportPlansJson, mergePlans } from './lib/plans';
 import styles from './App.module.css';
 
 const INITIAL_CONTAINER = { w: 60, d: 45, h: 40 };
@@ -134,6 +134,46 @@ export default function App() {
     }
     setToast('方案已删除');
     setTimeout(() => setToast(''), 2000);
+  };
+
+  /** 复制当前方案：量一排相似柜子时省得重填 */
+  const duplicatePlan = (id) => {
+    const src = plans.find((p) => p.id === id);
+    if (!src) return;
+    const n = planNumRef.current;
+    planNumRef.current += 1;
+    const copy = {
+      ...src,
+      id: `p${n}`,
+      name: `${src.name} 副本`,
+      container: { ...src.container },
+      specs: src.specs.map((s) => ({ ...s })),
+    };
+    setPlans((prev) => {
+      const idx = prev.findIndex((p) => p.id === id);
+      return [...prev.slice(0, idx + 1), copy, ...prev.slice(idx + 1)];
+    });
+    loadPlanIntoEditor(copy);
+    setActiveId(copy.id);
+    setToast(`已复制为「${copy.name}」`);
+    setTimeout(() => setToast(''), 2000);
+  };
+
+  const exportJson = () => {
+    exportPlansJson(plans);
+    setToast(`已导出 ${plans.length} 个方案的备份`);
+    setTimeout(() => setToast(''), 2000);
+  };
+
+  const importPlans = (imported) => {
+    setPlans((prev) => mergePlans(prev, imported));
+    setToast(`已导入 ${imported.length} 个方案`);
+    setTimeout(() => setToast(''), 2200);
+  };
+
+  const importError = (msg) => {
+    setToast(`导入失败：${msg}`);
+    setTimeout(() => setToast(''), 2600);
   };
 
   const packSpecs = useMemo(() => specs.map((s) => ({ ...s, count: Number(s.count) || 0 })), [specs]);
@@ -275,7 +315,7 @@ export default function App() {
   const safeLayer = activeLayer !== null && activeLayer < layerCount ? activeLayer : null;
 
   return (
-    <div className={styles.app}>
+    <div className={`${styles.app} app-root`}>
       <header className={styles.header}>
         <div className={styles.brand}>
           <span className={styles.logo} aria-hidden="true">
@@ -307,6 +347,10 @@ export default function App() {
             onNew={newPlan}
             onRename={renamePlan}
             onDelete={deletePlan}
+            onDuplicate={duplicatePlan}
+            onExportJson={exportJson}
+            onImport={importPlans}
+            onImportError={importError}
           />
           <ContainerPanel value={container} onChange={setContainer} />
           <BoxList specs={specs} onUpdate={updateSpec} onAdd={addSpec} onRemove={removeSpec} />

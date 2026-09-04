@@ -75,3 +75,28 @@ input[type='number'] {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* 打印：只输出购物清单卡片本身，隐藏应用其余部分 */
+@media print {
+  .app-root > *:not(.shopping-list-overlay) {
+    display: none !important;
+  }
+
+  .shopping-list-overlay {
+    position: static !important;
+    background: none !important;
+    padding: 0 !important;
+    animation: none !important;
+  }
+
+  .shopping-list-overlay > div {
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+    max-height: none !important;
+    animation: none !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}

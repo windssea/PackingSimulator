@@ -66,3 +66,70 @@ export function nextPlanNumber(plans) {
     }, 0) + 1
   );
 }
+
+/* ---------- JSON 导入导出：备份 / 跨设备分享 ---------- */
+
+/** 把方案库打包成 JSON 文件并触发下载 */
+export function exportPlansJson(plans) {
+  const payload = {
+    app: 'shouna-box-planner',
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    plans,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const date = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `收纳方案备份-${date}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/**
+ * 解析导入的 JSON：只接受本应用导出的结构，逐个校验方案合法性
+ * @returns {Array} 合法的方案数组
+ * @throws {Error} 结构不对时抛出可读的错误信息
+ */
+export function parsePlansJson(text) {
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error('文件不是有效的 JSON');
+  }
+  const plans = Array.isArray(data) ? data : data?.plans;
+  if (!Array.isArray(plans) || !plans.length) {
+    throw new Error('文件里没有方案数据');
+  }
+  const valid = plans.filter(isValidPlan);
+  if (!valid.length) {
+    throw new Error('方案数据不完整（缺少容器尺寸或盒子清单）');
+  }
+  return valid;
+}
+
+/**
+ * 合并导入的方案：id 撞了就用新编号，名字撞了就加「(导入)」后缀
+ * 不覆盖现有方案——导入只做追加，避免误删用户已有数据
+ */
+export function mergePlans(existing, imported) {
+  const usedIds = new Set(existing.map((p) => p.id));
+  const usedNames = new Set(existing.map((p) => p.name));
+  let n = nextPlanNumber(existing);
+  const merged = imported.map((p) => {
+    let { id, name } = p;
+    if (usedIds.has(id)) {
+      id = `p${n}`;
+      n += 1;
+    }
+    usedIds.add(id);
+    if (usedNames.has(name)) name = `${name}(导入)`;
+    usedNames.add(name);
+    return { ...p, id, name };
+  });
+  return [...existing, ...merged];
+}

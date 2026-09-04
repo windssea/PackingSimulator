@@ -1,19 +1,44 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { parsePlansJson } from '../lib/plans';
 import styles from './Panel.module.css';
 
 /**
- * 方案管理条：切换 / 新建 / 重命名 / 删除方案
+ * 方案管理条：切换 / 新建 / 重命名 / 删除 / 复制 / 导入导出方案
  * 家里几处柜子各存一个方案，互不覆盖
  */
-export default function PlansBar({ plans, activeId, onSwitch, onNew, onRename, onDelete }) {
+export default function PlansBar({
+  plans,
+  activeId,
+  onSwitch,
+  onNew,
+  onRename,
+  onDelete,
+  onDuplicate,
+  onExportJson,
+  onImport,
+  onImportError,
+}) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
+  const fileRef = useRef(null);
   const active = plans.find((p) => p.id === activeId) ?? plans[0];
 
   const commit = () => {
     const name = draft.trim();
     if (name) onRename(active.id, name);
     setEditing(false);
+  };
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // 允许重复选同一个文件
+    if (!file) return;
+    try {
+      const text = await file.text();
+      onImport(parsePlansJson(text));
+    } catch (err) {
+      onImportError?.(err.message || '导入失败');
+    }
   };
 
   return (
@@ -69,6 +94,25 @@ export default function PlansBar({ plans, activeId, onSwitch, onNew, onRename, o
         >
           ×
         </button>
+      </div>
+
+      <div className={styles.planActions}>
+        <button className={styles.planAction} onClick={() => onDuplicate(active.id)}>
+          复制方案
+        </button>
+        <button className={styles.planAction} onClick={onExportJson}>
+          导出备份
+        </button>
+        <button className={styles.planAction} onClick={() => fileRef.current?.click()}>
+          导入方案
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".json,application/json"
+          hidden
+          onChange={handleFile}
+        />
       </div>
 
       <p className={styles.note}>
